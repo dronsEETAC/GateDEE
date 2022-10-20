@@ -1,9 +1,9 @@
 import paho.mqtt.client as mqtt
 
 
-global_broker_address = "127.0.0.1"
-global_broker_port = 1884
-local_broker_address = "127.0.0.1"
+global_broker_address = "localhost"
+global_broker_port = 8083
+local_broker_address = "localhost"
 local_broker_port = 1883
 sendingVideoStream = False
 
@@ -66,7 +66,7 @@ def on_global_message(client, userdata, message):
         local_client.publish(message.topic, message.payload)
 
 
-global_client = mqtt.Client("Gate")
+global_client = mqtt.Client("Gate", transport="websockets")
 global_client.on_message = on_global_message
 global_client.connect(global_broker_address, global_broker_port)
 
