@@ -5,7 +5,7 @@ global_broker_address = "localhost"
 global_broker_port = 8083
 local_broker_address = "localhost"
 local_broker_port = 1883
-sendingVideoStream = False
+sending_video_stream = False
 
 
 def on_local_message(client, userdata, message):
@@ -15,14 +15,13 @@ def on_local_message(client, userdata, message):
 
 
 def on_global_message(client, userdata, message):
-    global sendingVideoStream
+    global sending_video_stream
     global local_client
     splited = message.topic.split("/")
     origin = splited[0]
-    destination = splited[1]
-    commnad = splited[2]
+    command = splited[2]
 
-    if commnad == "connectPlatform":
+    if command == "connectPlatform":
         print(origin + " connects platform")
 
         # connect to local broker
