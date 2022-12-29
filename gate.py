@@ -45,7 +45,6 @@ def on_global_message(client, userdata, message):
         global_client.subscribe(origin + "/LEDsService/#")
         global_client.subscribe(origin + "/cameraService/#")
         global_client.subscribe(origin + "/autopilotService/#")
-        global_client.subscribe(origin + "/guillemAguila/#")
 
         # subscribe to commands from dataService
 
