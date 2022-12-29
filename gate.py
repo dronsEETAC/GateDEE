@@ -1,77 +1,77 @@
 import paho.mqtt.client as mqtt
+from datetime import datetime
 
 
-global_broker_address = "localhost"
-global_broker_port = 8083
-local_broker_address = "localhost"
-local_broker_port = 1883
-sending_video_stream = False
 
 
-def on_local_message(client, userdata, message):
-    # just pass the message to the global broker
-    print("Pass message from local to global: " + message.topic)
-    global_client.publish(message.topic, message.payload)
+def on_internal_message(client, userdata, message):
+    global f
+
+    print ('internal message ', message.topic)
+    f.write('internal:'+ message.topic+ ' '+  datetime.now().strftime('%Y%m%d%H%M'))
 
 
-def on_global_message(client, userdata, message):
-    global sending_video_stream
-    global local_client
-    splited = message.topic.split("/")
-    origin = splited[0]
-    command = splited[2]
+def on_external_message(client, userdata, message):
+    global f
+    print('external message ', message.topic)
+    f.write('external:' + message.topic + ' ' +  datetime.now().strftime('%Y%m%d%H%M'))
 
-    if command == "connectPlatform":
-        print(origin + " connects platform")
 
-        # connect to local broker
-        local_client.on_message = on_local_message
-        local_client.connect(local_broker_address, local_broker_port)
-        local_client.loop_start()
+def Monitor (connection_mode):
+    global f
+    # Getting the current date and time
 
-        # Inform services
-        # ATENCION: quiza los servicios deberían saber quién ha conectado la plataforma
-        # (dashBoard o APP). No estoy seguro de que eso sea necesario.
-        # OTRA COSA: Si la App o el Dash piden conectar la plataforma cuando ya ha esta conectada
-        # entonces esto no hay que hacerlo.
-        local_client.publish("gate/LEDsService/connectPlatform")
-        local_client.publish("gate/cameraService/connectPlatform")
-        local_client.publish("gate/autopilotService/connectPlatform")
+    date = datetime.now().strftime('%Y%m%d%H%M')
+    myFileName = f'log{date}.txt'
+    f = open(myFileName, 'w')
 
-        # Subscribe to commands from services to the module (dash or App) that connected the platform
-        local_client.subscribe("+/" + origin + "/#")
+    global external_client
+    global internal_client
 
-        # subscribe to commands from origin
-        global_client.subscribe(origin + "/LEDsService/#")
-        global_client.subscribe(origin + "/cameraService/#")
-        global_client.subscribe(origin + "/autopilotService/#")
-        global_client.subscribe(origin + "/guillemAguila/#")
+    print ('Connection mode: ', connection_mode)
 
-        # subscribe to commands from dataService
 
-        # global_client.subscribe('LEDsControllerCommand/+')
-        # global_client.subscribe('cameraControllerCommand/+')
-        # global_client.subscribe('autopilotControllerCommand/+')
+    # The internal broker is always (global or local mode) at localhost:1884
+    internal_broker_address = "localhost"
+    internal_broker_port = 1884
 
-        # local_client.publish("connectPlatform")
-        # Subscribe to answers from controllers
-        # local_client.subscribe('LEDsControllerAnswer/+')
-        # local_client.subscribe('cameraControllerAnswer/+')
-        # local_client.subscribe('autopilotControllerAnswer/+')
-        # local_client.subscribe('dataService/+')
-        print("Gate connected")
+    if connection_mode == 'global':
+        # in global mode, the external broker must be running in internet
+        # and must operate with websockets
+        # there are several options:
+        # a public broker
+        external_broker_address = "broker.hivemq.com"
+        # our broker (that requires credentials)
+        #external_broker_address = "classpip.upc.edu"
+        # a mosquitto broker running at localhost (only in simulation mode)
+        #external_broker_address = "localhost"
+
     else:
-        # just pass the command to the local broker
-        print("Pass message from global to local: " + message.topic)
-        local_client.publish(message.topic, message.payload)
+        # in local mode, the external broker will run always in localhost
+        # (either in production or simulation mode)
+        external_broker_address = "localhost"
+
+    # the external broker must run always in port 8000
+    external_broker_port = 8000
 
 
-global_client = mqtt.Client("Gate", transport="websockets")
-global_client.on_message = on_global_message
-global_client.connect(global_broker_address, global_broker_port)
+    external_client = mqtt.Client("Motinor external", transport="websockets")
+    external_client.on_message = on_external_message
+    external_client.connect(external_broker_address, external_broker_port)
 
 
-global_client.loop_start()
-local_client = mqtt.Client("Gate")
-print("Waiting connection from DASH...")
-global_client.subscribe("+/gate/connectPlatform")
+    internal_client = mqtt.Client("Monitor_internal")
+    internal_client.on_message = on_internal_message
+    internal_client.connect(internal_broker_address, internal_broker_port)
+
+    print("Waiting ....")
+    external_client.subscribe("autopilotService/#")
+    internal_client.subscribe("#")
+    internal_client.loop_start()
+    external_client.loop_forever()
+
+
+if __name__ == '__main__':
+    import sys
+    connection_mode = sys.argv[1] # global or local
+    Monitor(connection_mode)
